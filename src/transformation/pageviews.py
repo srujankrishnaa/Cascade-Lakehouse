@@ -1,7 +1,7 @@
 import os
 from pyspark.sql import SparkSession
 from pyspark.sql.dataframe import DataFrame
-from src.utils.sparkudfs import SparkUDFs
+from src.spark_helpers.sparkudfs import SparkUDFs
 
 class PageViewsTransformation:
 

@@ -26,12 +26,12 @@ lakehouse-medallion-pipeline/
 ├── infrastructure/        # K8s deployments for MinIO, Nessie, Trino
 ├── spark-jobs/            # SparkApplication YAMLs (DDL, ingestion, transform, facts)
 ├── src/
-│   ├── ddl/               # Schema & table creation (CREATE TABLE IF NOT EXISTS)
+│   ├── table_setup/       # Schema & table creation (CREATE TABLE IF NOT EXISTS)
 │   ├── ingestion/         # Bronze layer: generate & ingest raw events
 │   ├── transformation/    # Silver layer: MERGE INTO with UDF enrichment
 │   ├── facts/             # Gold layer: aggregation + file compaction
-│   ├── services/          # Product & user lookup services (UDF data sources)
-│   └── utils/             # Spark session, UDF registration utilities
+│   ├── data_enrichment/   # Product & user lookup services (UDF data sources)
+│   └── spark_helpers/     # Spark session, UDF registration, product catalog
 ├── runners/               # Entry point scripts for each pipeline stage
 ├── Dockerfile             # Spark 3.5 + Python app image
 └── requirements.txt       # Python dependencies

@@ -1,4 +1,4 @@
-from src.utils.products import Products
+from src.spark_helpers.products import Products
 
 class ProductService:
     def __init__(self):

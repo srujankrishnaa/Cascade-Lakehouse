@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 from src.facts.productfacts import ProductFacts
-from src.utils.sparksessionutils import SparkSessionUtils
+from src.spark_helpers.sparksessionutils import SparkSessionUtils
 
 if __name__ == "__main__":
     parser = ArgumentParser()

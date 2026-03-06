@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from src.utils.sparksessionutils import SparkSessionUtils
+from src.spark_helpers.sparksessionutils import SparkSessionUtils
 from src.transformation.pageviews import PageViewsTransformation
 from src.transformation.clickevents import ClickEventsTransformation
 

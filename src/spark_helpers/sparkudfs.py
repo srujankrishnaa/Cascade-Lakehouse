@@ -1,6 +1,6 @@
-from src.services.userservice import UserService
-from src.services.productservice import ProductService
-from src.utils.products import Products
+from src.data_enrichment.userservice import UserService
+from src.data_enrichment.productservice import ProductService
+from src.spark_helpers.products import Products
 from pyspark.sql import SparkSession
 
 

@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 from src.ingestion.pageviews import PageViewsIngestion
 from src.ingestion.clickevents import ClickEventsIngestion
-from src.utils.sparksessionutils import SparkSessionUtils
+from src.spark_helpers.sparksessionutils import SparkSessionUtils
 import time
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, TimestampType
 from pyspark.sql.window import Window
 from pyspark.sql.functions import row_number, col
-from src.utils.products import Products
+from src.spark_helpers.products import Products
 
 
 class ClickEventsIngestion:

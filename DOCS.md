@@ -178,11 +178,11 @@ These YAMLs deploy the core platform services as Kubernetes pods:
 
 ---
 
-### DDL Setup (`src/ddl/`)
+### DDL Setup (`src/table_setup/`)
 
 These files create the Iceberg table schemas in each layer:
 
-#### `src/ddl/bronze/setup.py` — BronzeSetup
+#### `src/table_setup/bronze/setup.py` — BronzeSetup
 
 Creates the `nessie.bronze` namespace and two tables:
 
@@ -193,7 +193,7 @@ Creates the `nessie.bronze` namespace and two tables:
 
 **Why `bucket(3, event_id)`?** Distributes data across 3 buckets based on a hash of `event_id`. This ensures MERGE INTO queries only scan 1 of 3 buckets when matching by `event_id`, reducing I/O by ~67%.
 
-#### `src/ddl/silver/setup.py` — SilverSetup
+#### `src/table_setup/silver/setup.py` — SilverSetup
 
 Creates 4 Silver tables:
 
@@ -204,7 +204,7 @@ Creates 4 Silver tables:
 | `silver.page_views_agg` | Direct copy of Silver page_views (for streaming to Gold) | Same as `silver.page_views` |
 | `silver.click_events_agg` | Direct copy of Silver click_events (for streaming to Gold) | Same as `silver.click_events` |
 
-#### `src/ddl/gold/setup.py` — GoldSetup
+#### `src/table_setup/gold/setup.py` — GoldSetup
 
 Creates 1 Gold table:
 
@@ -353,9 +353,9 @@ Same pattern but aggregates click events with element-level granularity (adds `e
 
 ---
 
-### UDFs and Services (`src/utils/`, `src/services/`)
+### UDFs and Services (`src/spark_helpers/`, `src/data_enrichment/`)
 
-#### `src/utils/sparkudfs.py` — SparkUDFs
+#### `src/spark_helpers/sparkudfs.py` — SparkUDFs
 
 Registers 6 Spark SQL UDFs used in Silver transformation:
 
@@ -370,15 +370,15 @@ Registers 6 Spark SQL UDFs used in Silver transformation:
 
 > ⚠️ These are Python UDFs, which are slow because data crosses the JVM ↔ Python boundary for every row. In production, use **Pandas UDFs** (vectorized) or native Spark SQL functions.
 
-#### `src/utils/products.py` — Products
+#### `src/spark_helpers/products.py` — Products
 
 A product catalog of 25 products across 5 categories: Electronics, Clothing, Books, Sports, Food. Used to generate realistic page URLs and look up product details.
 
-#### `src/services/productservice.py` — ProductService
+#### `src/data_enrichment/productservice.py` — ProductService
 
 Wraps the Products catalog to return product details (name, segment) given a product ID.
 
-#### `src/services/userservice.py` — UserService
+#### `src/data_enrichment/userservice.py` — UserService
 
 Generates deterministic user attributes using `Faker` library with `hash(user_id)` as seed. This means the same `user_id` always gets the same location, age, and gender.
 
@@ -390,7 +390,7 @@ These are the **entry points** that the Docker container executes:
 
 | File | SparkApplication YAML | What It Runs |
 |------|----------------------|--------------|
-| `DDL.py` | `spark-jobs/ddl/*.yaml` | Creates schemas + tables. Arg: `--ddl_type=bronze\|silver\|gold` |
+| `SetupTables.py` | `spark-jobs/ddl/*.yaml` | Creates schemas + tables. Arg: `--ddl_type=bronze\|silver\|gold` |
 | `Ingestion.py` | `spark-jobs/bronze/*.yaml` | Continuous ingestion loop. Arg: `--ingestion_type=page_views\|click_events` |
 | `Transformation.py` | `spark-jobs/silver/silver-transform-*.yaml` | MERGE INTO enrichment. Arg: `--transformation_type=page_views\|click_events` |
 | `Aggregation.py` | `spark-jobs/silver/silver-aggregation-*.yaml` | Silver → Silver agg streaming. Arg: `--aggregation_type=page_views\|click_events` |
@@ -433,9 +433,9 @@ spec:
 
 | YAML | Runner | Purpose |
 |------|--------|---------|
-| `ddl/bronze-ddl.yaml` | DDL.py `--ddl_type=bronze` | Create Bronze namespace + tables |
-| `ddl/silver-ddl.yaml` | DDL.py `--ddl_type=silver` | Create Silver namespace + tables |
-| `ddl/gold-ddl.yaml` | DDL.py `--ddl_type=gold` | Create Gold namespace + tables |
+| `ddl/bronze-ddl.yaml` | SetupTables.py `--ddl_type=bronze` | Create Bronze namespace + tables |
+| `ddl/silver-ddl.yaml` | SetupTables.py `--ddl_type=silver` | Create Silver namespace + tables |
+| `ddl/gold-ddl.yaml` | SetupTables.py `--ddl_type=gold` | Create Gold namespace + tables |
 | `bronze/bronze-ingest-pageviews.yaml` | Ingestion.py `--ingestion_type=page_views` | Continuous page view generation |
 | `bronze/bronze-ingest-clickevents.yaml` | Ingestion.py `--ingestion_type=click_events` | Continuous click event generation |
 | `silver/silver-transform-pageviews.yaml` | Transformation.py `--transformation_type=page_views` | Bronze → Silver enrichment + dedup (page views) |
@@ -490,7 +490,7 @@ This creates a Docker image based on `apache/spark:3.5.3-python3` with your Pyth
 The image contains:
 ```
 /opt/application/
-├── DDL.py, Ingestion.py, Transformation.py, Aggregation.py, Facts.py
+├── SetupTables.py, Ingestion.py, Transformation.py, Aggregation.py, Facts.py
 └── src/ (all Python modules)
 ```
 

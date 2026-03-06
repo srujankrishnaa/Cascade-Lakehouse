@@ -1,8 +1,8 @@
 from argparse import ArgumentParser
-from src.ddl.bronze.setup import BronzeSetup
-from src.ddl.silver.setup import SilverSetup
-from src.ddl.gold.setup import GoldSetup
-from src.utils.sparksessionutils import SparkSessionUtils
+from src.table_setup.bronze.setup import BronzeSetup
+from src.table_setup.silver.setup import SilverSetup
+from src.table_setup.gold.setup import GoldSetup
+from src.spark_helpers.sparksessionutils import SparkSessionUtils
 
 
 if __name__ == "__main__":

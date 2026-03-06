@@ -11,7 +11,7 @@ spec:
   pythonVersion: "3"  # Python version
   mode: cluster  # Execution mode (cluster)
   image: "webclickstream-events"  # Docker image name
-  mainApplicationFile: local:///opt/application/DDL.py  # Main Python script path
+  mainApplicationFile: local:///opt/application/SetupTables.py  # Main Python script path
   sparkVersion: "3.5"  # Apache Spark version
   arguments: ["--ddl=bronze"]  # Command line arguments
   restartPolicy:

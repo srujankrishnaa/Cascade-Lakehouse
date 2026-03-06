@@ -1,4 +1,4 @@
-# Lakehouse Medallion Pipeline
+# Cascade Lakehouse
 
 A production-grade **Data Lakehouse** implementation using the **Medallion Architecture** (Bronze → Silver → Gold) on Kubernetes, built with Apache Spark, Apache Iceberg, Project Nessie, MinIO, and Trino.
 
@@ -76,6 +76,25 @@ lakehouse-medallion-pipeline/
 - Aggregates Silver data into `fact_product_metrics` with per-minute granularity
 - Runs Iceberg `rewrite_data_files` for file compaction (target: 512MB files)
 - Provides query-ready business metrics
+
+## MERGE-Based Idempotency
+
+The Silver layer implements **MERGE-based idempotency** to guarantee exactly-once semantics — even if a Spark job crashes and replays the same batch:
+
+```sql
+MERGE INTO silver.page_views AS target
+USING (SELECT ... FROM batch) AS source
+ON target.event_id = source.event_id
+WHEN NOT MATCHED THEN INSERT *
+-- ↑ Only inserts if event_id doesn't already exist in Silver
+```
+
+**Why this matters:**
+- If a streaming job **crashes and retries** the same batch, the MERGE skips already-inserted rows → **no duplicates**
+- If an event arrives in **multiple batches** (network retry, at-least-once delivery), it's inserted only once
+- Running the same batch N times produces the **exact same result** as running it once — that's idempotency
+
+**Production relevance:** In real-world pipelines with **Apache Kafka**, consumers use at-least-once delivery by default — the same event can be delivered multiple times. MERGE-based idempotency is the standard pattern to achieve **exactly-once semantics** at the storage layer, making it safe to replay data without worrying about duplicates.
 
 ## How Iceberg Writes Work
 
@@ -165,6 +184,7 @@ LIMIT 10;
 | Pattern | Where Used | Why |
 |---------|-----------|-----|
 | `MERGE INTO ... WHEN NOT MATCHED` | Silver Transform | Atomic upsert for cross-batch dedup |
+| MERGE-based idempotency | Silver Transform | Exactly-once semantics — safe to replay batches (essential for Kafka) |
 | `foreachBatch` + Spark Structured Streaming | All streaming jobs | Micro-batch processing with checkpoints |
 | `bucket(3, event_id)` partitioning | Bronze & Silver | Efficient partition pruning on JOINs |
 | `rewrite_data_files` | Gold Facts | File compaction to prevent small file problem |

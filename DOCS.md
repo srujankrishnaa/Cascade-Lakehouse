@@ -1,4 +1,4 @@
-# User Manual — Lakehouse Medallion Pipeline
+# User Manual — Cascade Lakehouse
 
 > A complete guide to set up, understand, and run a production-grade Data Lakehouse using the Medallion Architecture on a local Kubernetes cluster.
 

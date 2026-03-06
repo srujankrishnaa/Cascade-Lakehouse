@@ -2,6 +2,8 @@
 
 A production-grade **Data Lakehouse** implementation using the **Medallion Architecture** (Bronze → Silver → Gold) on Kubernetes, built with Apache Spark, Apache Iceberg, Project Nessie, MinIO, and Trino.
 
+> 📖 **For a detailed walkthrough of every file, step-by-step setup, and troubleshooting, see the [User Manual (DOCS.md)](DOCS.md)**
+
 ## Architecture
 
 ![Cascade Lakehouse Architecture](assets/architecture.png)

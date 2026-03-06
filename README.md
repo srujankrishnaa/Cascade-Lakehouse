@@ -4,32 +4,7 @@ A production-grade **Data Lakehouse** implementation using the **Medallion Archi
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         Kubernetes Cluster                             │
-│                                                                        │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐         │
-│  │  MinIO   │    │  Nessie  │    │  Trino   │    │  Spark   │         │
-│  │ (S3 Store)│    │ (Catalog)│    │ (Query)  │    │ (Compute)│         │
-│  └────┬─────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘         │
-│       │               │               │               │                │
-│       └───────────────┴───────────────┴───────────────┘                │
-│                           │                                            │
-│              ┌────────────┴────────────┐                               │
-│              │    Apache Iceberg       │                               │
-│              │   (Open Table Format)   │                               │
-│              └────────────┬────────────┘                               │
-│                           │                                            │
-│    ┌──────────────────────┼──────────────────────┐                     │
-│    │                      │                      │                     │
-│    ▼                      ▼                      ▼                     │
-│ ┌──────┐            ┌──────────┐           ┌──────────┐               │
-│ │BRONZE│  ────────► │  SILVER  │ ────────► │   GOLD   │               │
-│ │ Raw  │  Transform │ Enriched │ Aggregate │  Facts   │               │
-│ │ Data │  + Dedup   │  + Clean │ + Compact │ + Metrics│               │
-│ └──────┘            └──────────┘           └──────────┘               │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+![Cascade Lakehouse Architecture](assets/architecture.png)
 
 ## Tech Stack
 

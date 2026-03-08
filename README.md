@@ -27,11 +27,11 @@ lakehouse-medallion-pipeline/
 ├── spark-jobs/            # SparkApplication YAMLs (DDL, ingestion, transform, facts)
 ├── src/
 │   ├── table_setup/       # Schema & table creation (CREATE TABLE IF NOT EXISTS)
-│   ├── ingestion/         # Bronze layer: generate & ingest raw events
-│   ├── transformation/    # Silver layer: MERGE INTO with UDF enrichment
+│   ├── ingestion/         # Bronze layer: generate & ingest raw events + load dimensions
+│   ├── transformation/    # Silver layer: MERGE INTO with dimension table JOINs
 │   ├── facts/             # Gold layer: aggregation + file compaction
-│   ├── data_enrichment/   # Product & user lookup services (UDF data sources)
-│   └── spark_helpers/     # Spark session, UDF registration, product catalog
+│   ├── data_enrichment/   # Product & user lookup services (dim table data sources)
+│   └── spark_helpers/     # Spark session, product catalog
 ├── runners/               # Entry point scripts for each pipeline stage
 ├── Dockerfile             # Spark 3.5 + Python app image
 └── requirements.txt       # Python dependencies
@@ -46,7 +46,7 @@ lakehouse-medallion-pipeline/
 
 ### Silver (Enrichment & Dedup)
 - Streaming `MERGE INTO` ensures cross-batch deduplication on `event_id`
-- Enriches data via Spark UDFs: product details (ID, name, segment), user attributes (location, gender)
+- Enriches data via **dimension table JOINs** against `dim_products` and `dim_users` (replaces per-row Python UDFs for better performance)
 - Aggregation tables provide pre-computed summaries for Gold layer
 
 ### Gold (Business Facts)
@@ -78,12 +78,13 @@ WHEN NOT MATCHED THEN INSERT *
 ```
 DataFrame.writeTo("nessie.bronze.page_views").append()
     │
-    ├── 1. Spark writes Parquet files to MinIO  (s3://warehouse/bronze/...)
+    ├── 1. Spark writes Parquet data files to MinIO  (s3://warehouse/bronze/data/*.parquet)
     ├── 2. Iceberg creates a manifest file listing those Parquet files
     ├── 3. Iceberg creates a new snapshot pointing to the manifest
-    └── 4. Nessie records the snapshot on the "main" branch
+    ├── 4. Iceberg writes a NEW metadata file (v3.metadata.json) with the updated snapshot pointer
+    └── 5. Nessie atomically swaps the catalog pointer to the new metadata file
     
-    Old snapshots are never modified → time travel + concurrent reads are safe
+    Old snapshots & metadata files are never modified → time travel + concurrent reads are safe
 ```
 
 ## Prerequisites
@@ -119,14 +120,22 @@ kubectl apply -f spark-jobs/ddl/silver-ddl.yaml
 kubectl apply -f spark-jobs/ddl/gold-ddl.yaml
 ```
 
-### 5. Run Pipeline (Wave-by-Wave)
+### 5. Load Dimension Tables
+```bash
+# Load product catalog + user attributes into dim_products & dim_users
+# Must run AFTER DDL and BEFORE Silver transforms
+kubectl apply -f spark-jobs/ddl/load-dimensions.yaml
+# Wait for COMPLETED
+```
+
+### 6. Run Pipeline (Wave-by-Wave)
 
 ```bash
 # Wave 1: Bronze Ingestion
 kubectl apply -f spark-jobs/bronze/bronze-ingest-pageviews.yaml
 kubectl apply -f spark-jobs/bronze/bronze-ingest-clickevents.yaml
 
-# Wave 2: Silver Transform (after Bronze has data)
+# Wave 2: Silver Transform (JOINs against dim tables for enrichment)
 kubectl apply -f spark-jobs/silver/silver-transform-pageviews.yaml
 kubectl apply -f spark-jobs/silver/silver-transform-clickevents.yaml
 
@@ -139,7 +148,7 @@ kubectl apply -f spark-jobs/gold/gold-fact-productmetrics-pageview.yaml
 kubectl apply -f spark-jobs/gold/gold-fact-productmetrics-clickevents.yaml
 ```
 
-### 6. Query with Trino
+### 7. Query with Trino
 ```bash
 kubectl exec -it <trino-pod> -- trino
 
@@ -162,10 +171,11 @@ LIMIT 10;
 |---------|-----------|-----|
 | `MERGE INTO ... WHEN NOT MATCHED` | Silver Transform | Atomic upsert for cross-batch dedup |
 | MERGE-based idempotency | Silver Transform | Exactly-once semantics — safe to replay batches (essential for Kafka) |
+| Dimension table JOINs | Silver Transform | Enrich raw data with product/user attributes (replaces per-row Python UDFs) |
 | `foreachBatch` + Spark Structured Streaming | All streaming jobs | Micro-batch processing with checkpoints |
-| `bucket(3, event_id)` partitioning | Bronze & Silver | Efficient partition pruning on JOINs |
+| `bucket(3, event_id)` partitioning | Bronze & Silver | Efficient partition pruning on MERGE JOINs |
+| `month(created_ts)` partitioning | Bronze & Silver | Time-based query pruning for analytical queries |
 | `rewrite_data_files` | Gold Facts | File compaction to prevent small file problem |
-| Spark UDFs | Silver Transform | Enrich raw data with product/user attributes |
 
 ## License
 

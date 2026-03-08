@@ -29,7 +29,7 @@ class SilverSetup:
                             user_gender STRING
                         )
                         USING ICEBERG
-                        PARTITIONED BY (bucket(3, event_id))
+                        PARTITIONED BY (bucket(3, event_id), month(created_ts))
                        """)
         
         self.spark.sql(f"""
@@ -67,7 +67,7 @@ class SilverSetup:
                             element_tag STRING
                         )
                         USING ICEBERG
-                        PARTITIONED BY (bucket(3, event_id))
+                        PARTITIONED BY (bucket(3, event_id), month(created_ts))
                        """)
         self.spark.sql(f"""
                        CREATE TABLE nessie.silver.click_events_agg (

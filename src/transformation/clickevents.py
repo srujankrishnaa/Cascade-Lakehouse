@@ -1,24 +1,23 @@
 import os
 from pyspark.sql import SparkSession
 from pyspark.sql.dataframe import DataFrame
-from src.spark_helpers.sparkudfs import SparkUDFs
+
 
 class ClickEventsTransformation:
 
     def __init__(self, spark: SparkSession):
         self.spark = spark
         self.checkpointBase = os.getenv("WAREHOUSE")
-        self.sparkudfs = SparkUDFs(spark)
 
     def aggregate(self):
         
-        # Create a streaming DataFrame from the bronze layer page_views table
+        # Create a streaming DataFrame from the silver click_events table
         df = self.spark.readStream \
             .format("iceberg") \
             .option("streaming-max-files-per-micro-batch", "1") \
             .load("nessie.silver.click_events")
         
-        # Write the streaming DataFrame to the page_views_agg table
+        # Write the streaming DataFrame to the click_events_agg table
         stream = df.writeStream \
             .format("iceberg") \
             .outputMode("append") \
@@ -29,52 +28,50 @@ class ClickEventsTransformation:
         stream.awaitTermination()
         
     def transform(self):
-        # Define a function to handle each batch of data
+        # Define a function to handle each micro-batch
         def _upsert(input_df: DataFrame, _batch_id: int):
 
-            # Get the Spark session from the input DataFrame
             spark_session = input_df.sparkSession
 
-            # Deduplicate events by keeping only the latest event for each event_id
-            # This is done by:
-            # 1. Repartitioning by event_id to ensure all events with same ID are in same partition
-            # 2. Adding a row number within each event_id partition, ordered by timestamp descending
-            # 3. Keeping only the first row (most recent) for each event_id
-            
-            # Create a temporary view for SQL operations
+            # Register the micro-batch as a temp view for SQL
             input_df.createOrReplaceTempView("click_events_input")
 
-            # Use direct JOIN-based MERGE — avoids collect() OOM.
-            # Iceberg bucket(3, event_id) partition pruning handles efficiency.
+            # ─── JOIN-based enrichment ──────────────────────────────────
+            # Instead of per-row Python UDFs, we JOIN against pre-loaded
+            # dimension tables. This lets Spark's Catalyst optimizer:
+            #   - Broadcast the small dim tables (25 products, 5 users)
+            #   - Execute entirely in JVM (no Python serialization)
+            #   - Reuse matched rows across duplicates
             query = """
                 MERGE INTO nessie.silver.click_events AS target
-                USING ( SELECT 
-                            event_type, event_id, created_ts, session_id, user_id, page_url,
-                            get_product_id(page_url) as product_id,
-                            get_product_name(page_url) as product_name,
-                            get_product_segment(page_url) as product_segment,
-                            element_id,
-                            element_text,
-                            element_tag
-                            FROM click_events_input ) AS source
+                USING (
+                    SELECT 
+                        ce.event_type, ce.event_id, ce.created_ts, ce.session_id,
+                        ce.user_id, ce.page_url,
+                        dp.product_id,
+                        dp.product_name,
+                        dp.product_segment,
+                        ce.element_id,
+                        ce.element_text,
+                        ce.element_tag
+                    FROM click_events_input ce
+                    LEFT JOIN nessie.bronze.dim_products dp
+                        ON dp.product_url = ce.page_url
+                    LEFT JOIN nessie.bronze.dim_users du
+                        ON du.user_id = ce.user_id
+                ) AS source
                 ON target.event_id = source.event_id
                 WHEN NOT MATCHED THEN INSERT *
             """
             print(query)
             output_df = spark_session.sql(query)
             output_df.show()
-            output_df.explain(True)
-            input_df.unpersist()
 
-        # Register UDFs
-        self.sparkudfs.register_udfs()
-
-        # Create a streaming DataFrame from the bronze layer page_views table
+        # Create a streaming DataFrame from the bronze layer
         df = self.spark.readStream \
             .format("iceberg") \
             .option("streaming-max-files-per-micro-batch", "1") \
             .load("nessie.bronze.click_events")
-        
         
         # Configure and start the streaming job
         stream = df.writeStream \
@@ -84,5 +81,3 @@ class ClickEventsTransformation:
             .start()
         
         stream.awaitTermination()
-        
-        

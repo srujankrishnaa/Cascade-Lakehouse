@@ -37,7 +37,6 @@ class ProductFacts:
 
                 # Collect combinations (assumes limited number per micro-batch)
                 unique_keys = unique_keys_df.collect()
-                print("rahul-keys", unique_keys)
 
                 for row in unique_keys:
                     minute_ts = row["minute_ts"]
@@ -125,7 +124,6 @@ class ProductFacts:
 
                 # Collect combinations (assumes limited number per micro-batch)
                 unique_keys = unique_keys_df.collect()
-                print("rahul-keys", unique_keys)
 
                 for row in unique_keys:
                     minute_ts = row["minute_ts"]
@@ -140,7 +138,6 @@ class ProductFacts:
                         f"product_id = '{product_id}' AND "
                         f"count_type = 'clicks'"
                     )
-                    print("rahul-values", where_clause)
 
                     print(f"Compacting partition: {where_clause}")
                     minFileSizeBytes = 384 * 1024 * 1024 # 384 MB i.e 0.75 of 512 MB

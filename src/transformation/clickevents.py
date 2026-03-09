@@ -39,9 +39,11 @@ class ClickEventsTransformation:
             # ─── JOIN-based enrichment ──────────────────────────────────
             # Instead of per-row Python UDFs, we JOIN against pre-loaded
             # dimension tables. This lets Spark's Catalyst optimizer:
-            #   - Broadcast the small dim tables (25 products, 5 users)
+            #   - Broadcast the small dim table (25 products)
             #   - Execute entirely in JVM (no Python serialization)
             #   - Reuse matched rows across duplicates
+            # Note: click_events only enriches product data, not user data
+            #       (no user columns in Silver click_events schema)
             query = """
                 MERGE INTO nessie.silver.click_events AS target
                 USING (
@@ -57,8 +59,6 @@ class ClickEventsTransformation:
                     FROM click_events_input ce
                     LEFT JOIN nessie.bronze.dim_products dp
                         ON dp.product_url = ce.page_url
-                    LEFT JOIN nessie.bronze.dim_users du
-                        ON du.user_id = ce.user_id
                 ) AS source
                 ON target.event_id = source.event_id
                 WHEN NOT MATCHED THEN INSERT *
